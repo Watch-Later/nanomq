@@ -104,8 +104,9 @@ server_cb(void *arg)
 			work->msg = NULL;
 			nng_ctx_recv(work->ctx, work->aio);
 			break;
-		} else if (nng_msg_cmd_type(msg) == CMD_PUBLISH) {
+		} else if (nng_msg_cmd_type(msg) == CMD_PUBLISH || nng_msg_cmd_type(msg) == CMD_DISCONNECT_EV) {
 			nng_msg_set_timestamp(msg, nng_clock());
+			nng_msg_set_cmd_type(msg, CMD_PUBLISH);
 			handle_pub(work, work->pipe_ct);
 		} else if (nng_msg_cmd_type(msg) == CMD_CONNACK) {
 			work->pid = nng_msg_get_pipe(work->msg);
@@ -261,7 +262,7 @@ server_cb(void *arg)
 			smsg = NULL;
 			nng_aio_finish(work->aio, 0);
 			break;
-		} else if (nng_msg_cmd_type(work->msg) == CMD_PUBLISH) {
+		} else if (nng_msg_cmd_type(work->msg) == CMD_PUBLISH || nng_msg_cmd_type(work->msg) == CMD_DISCONNECT_EV) {
 			if ((rv = nng_aio_result(work->aio)) != 0) {
 				debug_msg("WAIT nng aio result error: %d", rv);
 				fatal("WAIT nng_ctx_recv/send", rv);
@@ -431,6 +432,7 @@ broker(conf *nanomq_conf)
 		works[i]         = alloc_work(sock);
 		works[i]->db     = db;
 		works[i]->db_ret = db_ret;
+		works[i]->ev_flag = 0;
 	}
 
 	if ((rv = nng_listen(sock, url, NULL, 0)) != 0) {

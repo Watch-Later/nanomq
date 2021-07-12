@@ -752,7 +752,6 @@ nano_msg_composer(
 	}
 	memcpy(ptr, payload.body, payload.len);
 	nni_msg_set_payload_ptr(msg, ptr);
-	nni_msg_set_cmd_type(msg, CMD_PUBLISH);
 
 	return msg;
 }

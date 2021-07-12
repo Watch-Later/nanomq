@@ -52,8 +52,6 @@ struct nano_ctx {
 	// nni_list      send_queue; // contexts waiting to send.
 	nni_list_node sqnode;
 	nni_list_node rqnode;
-	nni_msg *     rmsg;
-	nni_msg *     smsg;
 	// nni_timer_node qos_timer;
 };
 
@@ -178,7 +176,6 @@ nano_ctx_close(void *arg)
 		ctx->saio     = NULL;
 		ctx->spipe    = NULL;
 		ctx->qos_pipe = NULL;
-		ctx->rmsg     = NULL;
 		// nni_list_remove(&pipe->sendq, ctx);
 		nni_aio_finish_error(aio, NNG_ECLOSED);
 	}
@@ -818,27 +815,24 @@ nano_pipe_start(void *arg)
 	        return (NNG_EPROTO);
 	}
 	*/
-	nni_mtx_lock(&s->lk);
-	// TODO replace pipe_id with hash key of client_id
-	// pipe_id is just random value of id_dyn_val with self-increment.
-	rv = nni_id_set(&s->pipes, nni_pipe_id(p->pipe), p);
-	nni_mtx_unlock(&s->lk);
-	//futex here might not be necessary
-	nni_mtx_lock(&p->lk);
-	nni_aio_get_output(&p->aio_recv, 1);
 	nni_msg_alloc(&msg, 0);
 	nni_msg_header_append(msg, buf, 4);
 	reason = nni_msg_header(msg) + 2;
+	nni_mtx_lock(&s->lk);
+	// TODO replace pipe_id with hash key of client_id
+	// pipe_id is just random value of id_dyn_val with self-increment.
+	nni_id_set(&s->pipes, nni_pipe_id(p->pipe), p);
 	rv = verify_connect(p->conn_param, &rv, s->conf);
 	if (rv != 0) {
 		// TODO disconnect client && send connack with reason code 0x05
 		debug_syslog("Invalid auth info.");
-		*(reason + 3) = rv;
+		*(reason + 1) = rv;		//set return code
 	}
 	rv = nano_session_restore(p, s, reason);
+	nni_mtx_unlock(&s->lk);
 
-	// TODO MQTT V5
-	if (*(reason + 3) == 0) {
+	// TODO MQTT V5 check return code
+	if (*(reason + 1) == 0) {
 		nni_sleep_aio(s->conf->qos_timer * 1500, &p->aio_timer);
 	}
 	nni_msg_set_cmd_type(msg, CMD_CONNACK);
@@ -846,7 +840,6 @@ nano_pipe_start(void *arg)
 	// There is no need to check the  state of aio_recv
 	// Since pipe_start is definetly the first cb to be excuted of pipe.
 	nni_aio_set_msg(&p->aio_recv, msg);
-	nni_mtx_unlock(&p->lk);
 	nni_aio_finish(&p->aio_recv, 0, nni_msg_len(msg));
 	return (rv);
 }
@@ -886,34 +879,50 @@ close_pipe(nano_pipe *p, uint8_t reason_code)
 static void
 nano_pipe_close(void *arg, uint8_t reason_code)
 {
-	nano_pipe *p = arg;
-	nano_sock *s = p->rep;
+	nano_pipe * p = arg;
+	nano_sock * s = p->rep;
+	nano_ctx *  ctx;
+	conn_param *cparam;
+	nni_aio *   aio = NULL;
+	nni_msg *   msg;
 
 	debug_msg("################# nano_pipe_close ##############");
 	nni_mtx_lock(&s->lk);
 	close_pipe(p, reason_code);
-	// pub last will msg
-	if (p->conn_param->will_flag) {
-		nano_ctx *ctx;
-		nni_aio * aio = NULL;
-		nni_msg * msg;
-		if ((ctx = nni_list_first(&s->recvq)) != NULL) {
-		    msg = nano_msg_composer(p->conn_param->will_retain,
-		                            p->conn_param->will_qos,
-		                            p->conn_param->will_msg,
-		                            p->conn_param->will_topic);
-			if (msg == NULL) {
-				nni_mtx_unlock(&s->lk);
-				return;
-			}
-			aio = ctx->raio;
-			ctx->raio = NULL;
-			nni_list_remove(&s->recvq, ctx);
+	// pub last will msg & disconnect event
+	if ((ctx = nni_list_first(&s->recvq)) != NULL) {
+		if (p->conn_param->will_flag) {
+			msg = nano_msg_composer(p->conn_param->will_retain,
+			    p->conn_param->will_qos, p->conn_param->will_msg,
+			    p->conn_param->will_topic);
+		} else {
+			mqtt_string string, topic;
+			uint8_t     buff[256], buf_topic[256];
+			cparam = p->conn_param;
+			// "{\"username\":\"%s\",
+			// \"ts\":%ld,\"reason_code\":\"%s\",\"client_id\":\"%s\"}"
+			snprintf(buff, 256, DISCONNECT_MSG,
+			    cparam->username.body, (uint64_t) nng_clock(),
+			    reason_code, cparam->clientid.body);
+			string.body = buff;
+			string.len  = strlen(string.body);
+			snprintf(buf_topic, 256, DISCONNECT_TOPIC);
+			topic.body = buf_topic;
+			topic.len  = strlen(buf_topic);
+			msg        = nano_msg_composer(0, 0, string, topic);
+		}
+		if (msg == NULL) {
 			nni_mtx_unlock(&s->lk);
-			nni_aio_set_msg(aio, msg);
-			nni_aio_finish(aio, 0, nni_msg_len(msg));
 			return;
 		}
+		nni_msg_set_cmd_type(msg, CMD_DISCONNECT_EV);
+		aio       = ctx->raio;
+		ctx->raio = NULL;
+		nni_list_remove(&s->recvq, ctx);
+		nni_mtx_unlock(&s->lk);
+		nni_aio_set_msg(aio, msg);
+		nni_aio_finish(aio, 0, nni_msg_len(msg));
+		return;
 	}
 	nni_mtx_unlock(&s->lk);
 }

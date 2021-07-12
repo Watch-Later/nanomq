@@ -7,6 +7,10 @@
 #include <conf.h>
 #include <stdlib.h>
 
+#define DISCONNECT_MSG  "{\"username\":\"%s\", \"ts\":%ld,\"reason_code\":\"%x\",\"client_id\":\"%s\"}"
+#define DISCONNECT_TOPIC  "$SYS/brokers/disconnected"
+#define CONNECT_TOPIC  "$SYS/brokers/connected"
+
 // int hex_to_oct(char *str);
 //
 // uint32_t htoi(char *str);
