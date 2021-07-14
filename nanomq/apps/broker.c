@@ -66,7 +66,7 @@ server_cb(void *arg)
 {
 	nano_work *work = arg;
 	nng_msg * msg;
-	nng_msg * smsg = NULL, *tmsg = NULL;
+	nng_msg * smsg = NULL;
 	int       rv, i;
 
 	reason_code reason;
@@ -99,12 +99,25 @@ server_cb(void *arg)
 		work->cparam = nng_msg_get_conn_param(work->msg);
 
 		if (nng_msg_cmd_type(msg) == CMD_DISCONNECT) {
-			work->state = RECV;
+			// TODO reuse DISCONNECT msg
 			nng_msg_free(msg);
-			work->msg = NULL;
-			nng_ctx_recv(work->ctx, work->aio);
-			break;
-		} else if (nng_msg_cmd_type(msg) == CMD_PUBLISH || nng_msg_cmd_type(msg) == CMD_DISCONNECT_EV) {
+			if (conn_param_get_will_flag(work->cparam)) {
+				//pub last will msg
+				msg = nano_msg_composer(
+				    conn_param_get_will_retain(work->cparam),
+				    conn_param_get_will_qos(work->cparam),
+				    conn_param_get_will_msg(work->cparam),
+				    conn_param_get_will_topic(work->cparam));
+				nng_msg_set_cmd_type(msg, CMD_PUBLISH);
+				work->msg = msg;
+				handle_pub(work, work->pipe_ct);
+			} else {
+				work->msg   = NULL;
+				work->state = RECV;
+				nng_ctx_recv(work->ctx, work->aio);
+				break;
+			}
+		} else if (nng_msg_cmd_type(msg) == CMD_PUBLISH) {
 			nng_msg_set_timestamp(msg, nng_clock());
 			nng_msg_set_cmd_type(msg, CMD_PUBLISH);
 			handle_pub(work, work->pipe_ct);
@@ -117,11 +130,11 @@ server_cb(void *arg)
 			nng_ctx_send(work->ctx, work->aio);
 			nng_aio_finish(work->aio, 0);
 			break;
+		} else if (nng_msg_cmd_type(msg) == CMD_DISCONNECT_EV) {
+			nng_msg_set_cmd_type(work->msg, CMD_PUBLISH);
+			handle_pub(work, work->pipe_ct);
 		}
 		work->state = WAIT;
-		debug_msg(
-		    "RECV ********************* msg: %x*****************\n",
-		    nng_msg_cmd_type(work->msg));
 		nng_aio_finish(work->aio, 0);
 		// nng_aio_finish_sync(work->aio, 0);
 		break;
@@ -363,6 +376,8 @@ server_cb(void *arg)
 		work->msg   = NULL;
 		work->state = RECV;
 		nng_ctx_recv(work->ctx, work->aio);
+		break;
+	case NOTIFY:
 		break;
 	default:
 		fatal("bad state!", NNG_ESTATE);
