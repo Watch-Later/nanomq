@@ -278,6 +278,7 @@ nano_ctx_send(void *arg, nni_aio *aio)
 		// lost interest in our reply.
 		nni_mtx_unlock(&s->lk);
 		nni_aio_set_msg(aio, NULL);
+		//TODO lastwill/SYS topic will trigger this (sub to the topic that publish to by itself)
 		nni_println("ERROR: pipe is gone, pub failed");
 		nni_msg_free(msg);
 		return;
@@ -822,7 +823,7 @@ nano_pipe_start(void *arg)
 	// TODO replace pipe_id with hash key of client_id
 	// pipe_id is just random value of id_dyn_val with self-increment.
 	nni_id_set(&s->pipes, nni_pipe_id(p->pipe), p);
-	rv = verify_connect(p->conn_param, &rv, s->conf);
+	rv = verify_connect(p->conn_param, s->conf);
 	if (rv != 0) {
 		// TODO disconnect client && send connack with reason code 0x05
 		debug_syslog("Invalid auth info.");
@@ -889,32 +890,14 @@ nano_pipe_close(void *arg, uint8_t reason_code)
 	debug_msg("################# nano_pipe_close ##############");
 	nni_mtx_lock(&s->lk);
 	close_pipe(p, reason_code);
-	// pub last will msg & disconnect event
+	// pub disconnect event
 	if ((ctx = nni_list_first(&s->recvq)) != NULL) {
-		if (p->conn_param->will_flag) {
-			msg = nano_msg_composer(p->conn_param->will_retain,
-			    p->conn_param->will_qos, p->conn_param->will_msg,
-			    p->conn_param->will_topic);
-		} else {
-			mqtt_string string, topic;
-			uint8_t     buff[256], buf_topic[256];
-			cparam = p->conn_param;
-			// "{\"username\":\"%s\",
-			// \"ts\":%ld,\"reason_code\":\"%s\",\"client_id\":\"%s\"}"
-			snprintf(buff, 256, DISCONNECT_MSG,
-			    cparam->username.body, (uint64_t) nng_clock(),
-			    reason_code, cparam->clientid.body);
-			string.body = buff;
-			string.len  = strlen(string.body);
-			snprintf(buf_topic, 256, DISCONNECT_TOPIC);
-			topic.body = buf_topic;
-			topic.len  = strlen(buf_topic);
-			msg        = nano_msg_composer(0, 0, string, topic);
-		}
+		msg = nano_msg_notify_disconnect(p->conn_param, reason_code);
 		if (msg == NULL) {
 			nni_mtx_unlock(&s->lk);
 			return;
 		}
+		nni_msg_set_conn_param(msg, p->conn_param);
 		nni_msg_set_cmd_type(msg, CMD_DISCONNECT_EV);
 		aio       = ctx->raio;
 		ctx->raio = NULL;
