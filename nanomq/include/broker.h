@@ -11,7 +11,6 @@ struct work {
 	enum { INIT, RECV, WAIT, SEND, RESEND, FREE, NOTIFY } state;
 
 	uint8_t   proto;
-	uint8_t   ev_flag;
 	nng_aio * aio;
 	nng_msg * msg;
 	nng_msg **msg_ret;

@@ -380,7 +380,6 @@ server_cb(void *arg)
 	case NOTIFY:
 		// nng_msg_clear(smsg);
 		// nng_msg_header_clear(smsg);
-
 		if ((rv = nng_aio_result(work->aio)) != 0) {
 			debug_msg("SEND nng aio result error: %d", rv);
 			fatal("SEND nng_ctx_send", rv);
@@ -463,7 +462,6 @@ broker(conf *nanomq_conf)
 		works[i]         = alloc_work(sock);
 		works[i]->db     = db;
 		works[i]->db_ret = db_ret;
-		works[i]->ev_flag = 0;
 	}
 
 	if ((rv = nng_listen(sock, url, NULL, 0)) != 0) {
