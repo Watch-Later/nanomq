@@ -10,6 +10,12 @@
 #define DISCONNECT_MSG           \
 	"{\"username\":\"%s\", " \
 	"\"ts\":%lu,\"reason_code\":\"%x\",\"client_id\":\"%s\"}"
+#define CONNECT_MSG           \
+	"{\"username\":\"%s\", " \
+	"\"ts\":%lu,\"proto_name\":\"%s\",\"reason_code\":\"%x\",\"client_id\":\"%s\"}"
+	
+	// "{\"username\":\"%s\", " \
+	// "\"ts\":%lu,\"proto_name\":\"%s\",\"keepalive\":%s,\"return_code\":\"%x\",\"proto_ver\":%d,\"client_id\":\"%s\", \"clean_start\":%d}"
 #define DISCONNECT_TOPIC "$SYS/brokers/disconnected"
 #define CONNECT_TOPIC "$SYS/brokers/connected"
 
@@ -47,5 +53,6 @@ NNG_DECL void nano_msg_set_dup(nng_msg *msg);
 NNG_DECL nng_msg *nano_msg_composer(
     uint8_t retain, uint8_t qos, mqtt_string *payload, mqtt_string *topic);
 NNG_DECL nng_msg *nano_msg_notify_disconnect(conn_param *cparam, uint8_t code);
+NNG_DECL nng_msg *nano_msg_notify_connect(conn_param *cparam, uint8_t code);
 
 #endif // NNG_MQTT_H

@@ -705,7 +705,7 @@ nano_msg_set_dup(nng_msg *msg)
 	*header = *header | 0x08;
 }
 
-// compose a publish msg according to your need
+// alloc a publish msg according to the need
 nng_msg *
 nano_msg_composer(
     uint8_t retain, uint8_t qos, mqtt_string *payload, mqtt_string *topic)
@@ -801,6 +801,29 @@ nano_msg_notify_disconnect(conn_param *cparam, uint8_t code)
 	string.body = buff;
 	string.len  = strlen(string.body);
 	snprintf(buf_topic, 256, DISCONNECT_TOPIC);
+	topic.body = buf_topic;
+	topic.len  = strlen(buf_topic);
+	msg        = nano_msg_composer(0, 0, &string, &topic);
+	return msg;
+}
+
+nng_msg *
+nano_msg_notify_connect(conn_param *cparam, uint8_t code)
+{
+	nni_msg *   msg;
+	mqtt_string string, topic;
+	uint8_t     buff[512], buf_topic[256];
+	/*
+	"{\"username\":\"%s\", " \
+	"\"ts\":%lu,\"proto_name\":\"%s\",\"keepalive\":%u,\"return_code\":\"%x\",\"proto_ver\":%d,\"client_id\":\"%s\", \"clean_start\":%d}"
+	*/
+	// snprintf(buff, 512, CONNECT_MSG, cparam->username.body,
+	//     (uint64_t) nni_clock(), cparam->pro_name.body, cparam->keepalive_mqtt, code, &cparam->pro_ver, cparam->clientid.body, cparam->clean_start);
+		snprintf(buff, 256, CONNECT_MSG, cparam->username.body,
+	    (uint64_t) nni_clock(), cparam->pro_name.body, code, cparam->clientid.body);
+	string.body = buff;
+	string.len  = strlen(string.body);
+	snprintf(buf_topic, 256, CONNECT_TOPIC);
 	topic.body = buf_topic;
 	topic.len  = strlen(buf_topic);
 	msg        = nano_msg_composer(0, 0, &string, &topic);
