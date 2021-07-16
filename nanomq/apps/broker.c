@@ -67,7 +67,8 @@ server_cb(void *arg)
 	nano_work *work = arg;
 	nng_msg * msg;
 	nng_msg * smsg = NULL;
-	int       rv, i;
+	uint8_t   flag;
+	int       rv;
 
 	reason_code reason;
 	uint8_t *   ptr;
@@ -102,7 +103,7 @@ server_cb(void *arg)
 			// TODO reuse DISCONNECT msg
 			nng_msg_free(msg);
 			if (conn_param_get_will_flag(work->cparam)) {
-				//pub last will msg
+				//pub last will msg TODO reuse same msg.
 				msg = nano_msg_composer(
 				    conn_param_get_will_retain(work->cparam),
 				    conn_param_get_will_qos(work->cparam),
@@ -124,9 +125,10 @@ server_cb(void *arg)
 		} else if (nng_msg_cmd_type(msg) == CMD_CONNACK) {
 			work->pid = nng_msg_get_pipe(work->msg);
 			nng_msg_set_pipe(work->msg, work->pid);
+			// clone for sending connect event notification
+			nng_msg_clone(work->msg);
 			nng_aio_set_msg(work->aio, work->msg);
-			work->msg   = NULL;
-			work->state = SEND;
+			work->state = NOTIFY;
 			nng_ctx_send(work->ctx, work->aio);
 			nng_aio_finish(work->aio, 0);
 			break;
@@ -275,7 +277,7 @@ server_cb(void *arg)
 			smsg = NULL;
 			nng_aio_finish(work->aio, 0);
 			break;
-		} else if (nng_msg_cmd_type(work->msg) == CMD_PUBLISH || nng_msg_cmd_type(work->msg) == CMD_DISCONNECT_EV) {
+		} else if (nng_msg_cmd_type(work->msg) == CMD_PUBLISH) {
 			if ((rv = nng_aio_result(work->aio)) != 0) {
 				debug_msg("WAIT nng aio result error: %d", rv);
 				fatal("WAIT nng_ctx_recv/send", rv);
@@ -358,8 +360,6 @@ server_cb(void *arg)
 		break;
 
 	case SEND:
-		debug_msg(
-		    "SEND  ^^^^^^^^^^^^^^^^^^^^^ ctx%d ^^^^\n", work->ctx.id);
 		if (NULL != smsg) {
 			smsg = NULL;
 		}
@@ -378,6 +378,22 @@ server_cb(void *arg)
 		nng_ctx_recv(work->ctx, work->aio);
 		break;
 	case NOTIFY:
+		// nng_msg_clear(smsg);
+		// nng_msg_header_clear(smsg);
+
+		if ((rv = nng_aio_result(work->aio)) != 0) {
+			debug_msg("SEND nng aio result error: %d", rv);
+			fatal("SEND nng_ctx_send", rv);
+		}
+		uint8_t *header = nng_msg_header(work->msg) + 3;
+		flag = *header;
+		nng_msg_free(work->msg);
+		smsg = nano_msg_notify_connect(work->cparam, flag);
+		nng_msg_set_cmd_type(smsg, CMD_PUBLISH);
+		work->msg = smsg;
+		work->state = WAIT;
+		handle_pub(work, work->pipe_ct);
+		nng_aio_finish(work->aio, 0);
 		break;
 	default:
 		fatal("bad state!", NNG_ESTATE);
