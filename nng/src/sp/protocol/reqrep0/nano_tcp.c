@@ -755,6 +755,7 @@ nano_pipe_init(void *arg, nni_pipe *pipe, void *s)
 	nni_mtx_init(&p->lk);
 	nni_lmq_init(&p->rlmq, sock->conf->msq_len);
 	nni_aio_init(&p->aio_send, nano_pipe_send_cb, p);
+	//TODO move keepalive monitor to transport layer?
 	nni_aio_init(&p->aio_timer, nano_pipe_timer_cb, p);
 	nni_aio_init(&p->aio_recv, nano_pipe_recv_cb, p);
 
@@ -1124,10 +1125,10 @@ nano_pipe_recv_cb(void *arg)
 
 drop:
 	nni_aio_set_msg(&p->aio_recv, NULL);
-	nni_pipe_recv(p->pipe, &p->aio_recv);
 	nni_msg_free(msg);
-	debug_msg("Warning:dropping msg");
 end:
+	nni_pipe_recv(p->pipe, &p->aio_recv);
+	debug_msg("Warning:dropping msg");
 	return;
 }
 

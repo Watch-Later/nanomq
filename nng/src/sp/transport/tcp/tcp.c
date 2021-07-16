@@ -671,10 +671,11 @@ recv_error:
 	return;
 notify:
 	// nni_pipe_bump_rx(p->npipe, n);
-	// nni_aio_list_remove(aio);
-	tcptran_pipe_recv_start(p);
+	nni_aio_list_remove(aio);
+	//tcptran_pipe_recv_start(p);
 	nni_mtx_unlock(&p->mtx);
-	// nni_aio_finish_error(aio, rv);		//only finishes when we need
+	nni_aio_set_msg(aio, NULL);
+	nni_aio_finish(aio, 0, 0);		//only finishes when we need
 	// PINGREQ event
 	return;
 }
