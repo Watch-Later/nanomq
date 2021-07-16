@@ -98,6 +98,7 @@ server_cb(void *arg)
 		}
 		work->msg    = msg;
 		work->cparam = nng_msg_get_conn_param(work->msg);
+		work->proto = conn_param_get_protover(work->cparam);
 
 		if (nng_msg_cmd_type(msg) == CMD_DISCONNECT) {
 			// TODO reuse DISCONNECT msg
@@ -462,6 +463,7 @@ broker(conf *nanomq_conf)
 		works[i]         = alloc_work(sock);
 		works[i]->db     = db;
 		works[i]->db_ret = db_ret;
+		works[i]->proto  = 0;
 	}
 
 	if ((rv = nng_listen(sock, url, NULL, 0)) != 0) {
