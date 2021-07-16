@@ -43,7 +43,7 @@ get_value_size(uint64_t value)
 	uint8_t  len = 1;
 	uint64_t pow;
 	for (int i = 1; i <= 4; ++i) {
-		pow = power(0x100, i);
+		pow = power(0x080, i);
 		if (value >= pow) {
 			++len;
 		} else {
@@ -795,14 +795,13 @@ nano_msg_notify_disconnect(conn_param *cparam, uint8_t code)
 {
 	nni_msg *   msg;
 	mqtt_string string, topic;
-	uint8_t     buff[256], buf_topic[256];
+	uint8_t     buff[256];
 	snprintf(buff, 256, DISCONNECT_MSG, cparam->username.body,
 	    (uint64_t) nni_clock(), code, cparam->clientid.body);
 	string.body = buff;
 	string.len  = strlen(string.body);
-	snprintf(buf_topic, 256, DISCONNECT_TOPIC);
-	topic.body = buf_topic;
-	topic.len  = strlen(buf_topic);
+	topic.body = DISCONNECT_TOPIC;
+	topic.len  = strlen(DISCONNECT_TOPIC);
 	msg        = nano_msg_composer(0, 0, &string, &topic);
 	return msg;
 }
@@ -812,20 +811,13 @@ nano_msg_notify_connect(conn_param *cparam, uint8_t code)
 {
 	nni_msg *   msg;
 	mqtt_string string, topic;
-	uint8_t     buff[512], buf_topic[256];
-	/*
-	"{\"username\":\"%s\", " \
-	"\"ts\":%lu,\"proto_name\":\"%s\",\"keepalive\":%u,\"return_code\":\"%x\",\"proto_ver\":%d,\"client_id\":\"%s\", \"clean_start\":%d}"
-	*/
-	// snprintf(buff, 512, CONNECT_MSG, cparam->username.body,
-	//     (uint64_t) nni_clock(), cparam->pro_name.body, cparam->keepalive_mqtt, code, &cparam->pro_ver, cparam->clientid.body, cparam->clean_start);
-		snprintf(buff, 256, CONNECT_MSG, cparam->username.body,
-	    (uint64_t) nni_clock(), cparam->pro_name.body, code, cparam->clientid.body);
+	uint8_t     buff[256];
+	snprintf(buff, 256, CONNECT_MSG, cparam->username.body,
+	    (uint64_t) nni_clock(), cparam->pro_name.body, cparam->keepalive_mqtt, code, cparam->pro_ver, cparam->clientid.body, cparam->clean_start);
 	string.body = buff;
 	string.len  = strlen(string.body);
-	snprintf(buf_topic, 256, CONNECT_TOPIC);
-	topic.body = buf_topic;
-	topic.len  = strlen(buf_topic);
+	topic.body = CONNECT_TOPIC;
+	topic.len  = strlen(CONNECT_TOPIC);
 	msg        = nano_msg_composer(0, 0, &string, &topic);
 	return msg;
 }

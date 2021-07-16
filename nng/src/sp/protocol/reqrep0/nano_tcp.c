@@ -279,7 +279,7 @@ nano_ctx_send(void *arg, nni_aio *aio)
 		nni_mtx_unlock(&s->lk);
 		nni_aio_set_msg(aio, NULL);
 		//TODO lastwill/SYS topic will trigger this (sub to the topic that publish to by itself)
-		nni_println("ERROR: pipe is gone, pub failed");
+		debug_syslog("ERROR: pipe is gone, pub failed");
 		nni_msg_free(msg);
 		return;
 	}
