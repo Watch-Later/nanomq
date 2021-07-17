@@ -131,7 +131,7 @@ server_cb(void *arg)
 			nng_aio_set_msg(work->aio, work->msg);
 			work->state = NOTIFY;
 			nng_ctx_send(work->ctx, work->aio);
-			nng_aio_finish(work->aio, 0);
+			nng_aio_finish_sync(work->aio, 0);
 			break;
 		} else if (nng_msg_cmd_type(msg) == CMD_DISCONNECT_EV) {
 			nng_msg_set_cmd_type(work->msg, CMD_PUBLISH);

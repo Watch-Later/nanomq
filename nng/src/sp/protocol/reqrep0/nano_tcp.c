@@ -893,24 +893,24 @@ nano_pipe_close(void *arg, uint8_t reason_code)
 	nni_mtx_lock(&s->lk);
 	close_pipe(p, reason_code);
 	// pub disconnect event
-	if ((ctx = nni_list_first(&s->recvq)) != NULL) {
-		msg = nano_msg_notify_disconnect(p->conn_param, reason_code);
-		if (msg == NULL) {
-			nni_mtx_unlock(&s->lk);
-			return;
-		}
-		nni_msg_set_conn_param(msg, p->conn_param);
-		nni_msg_set_cmd_type(msg, CMD_DISCONNECT_EV);
-		aio       = ctx->raio;
-		ctx->raio = NULL;
-		nni_list_remove(&s->recvq, ctx);
-		nni_mtx_unlock(&s->lk);
-		nni_aio_set_msg(aio, msg);
-		nni_aio_finish_sync(aio, 0, nni_msg_len(msg));
-		return;
-	} else {
-		debug_msg("Warning: no ctx left!! faied to send disconnect notification");
-	}
+	// if ((ctx = nni_list_first(&s->recvq)) != NULL) {
+	// 	msg = nano_msg_notify_disconnect(p->conn_param, reason_code);
+	// 	if (msg == NULL) {
+	// 		nni_mtx_unlock(&s->lk);
+	// 		return;
+	// 	}
+	// 	nni_msg_set_conn_param(msg, p->conn_param);
+	// 	nni_msg_set_cmd_type(msg, CMD_DISCONNECT_EV);
+	// 	aio       = ctx->raio;
+	// 	ctx->raio = NULL;
+	// 	nni_list_remove(&s->recvq, ctx);
+	// 	nni_mtx_unlock(&s->lk);
+	// 	nni_aio_set_msg(aio, msg);
+	// 	nni_aio_finish_sync(aio, 0, nni_msg_len(msg));
+	// 	return;
+	// } else {
+	// 	debug_msg("Warning: no ctx left!! faied to send disconnect notification");
+	// }
 	nni_mtx_unlock(&s->lk);
 }
 
